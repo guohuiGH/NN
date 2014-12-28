@@ -1,0 +1,207 @@
+#include<iostream>
+#include<fstream>
+#include<sstream>
+#include<string>
+#include<vector>
+using namespace	std;
+
+const int TRAIN_SIZE = 10000;
+const int TEST_SIZE = 10000;
+const int FEATURE = 384;
+const int HIDDEN_FEATURE = 50;
+const int OUTPUT = 1;
+const double rate1 = 0.9;
+const double rate2 = 0.9;
+double trainData[TRAIN_SIZE][FEATURE];
+double testData[TRAIN_SIZE][FEATURE];
+double value[TRAIN_SIZE];
+double hiddenValue[HIDDEN_FEATURE];
+double weight1[FEATURE][HIDDEN_FEATURE];
+double weight2[HIDDEN_FEATURE][OUTPUT];
+double errorHidden[HIDDEN_FEATURE];
+double errorOutput[OUTPUT];
+double predictValue[TEST_SIZE];
+double error;
+//vector<vector<int> >trainData;
+//vector<int>value;
+
+inline double random(double scale) {return ((double(rand()) / RAND_MAX)*scale - 1)/10;}
+
+inline double eps(double t1, double t2) {return 1 / (1 + exp(t1-t2));}
+
+void getTrainData() {
+	ifstream fin("train.csv");
+
+	string line;
+	getline(fin,line);
+	vector<int>data;
+	int id;
+	char ch;
+	for (int i = 0; i < TRAIN_SIZE; i++) {
+		fin  >> id;
+		fin >> ch >> value[i];
+		for (int j = 0; j < FEATURE; j++) {
+			fin >> ch >> trainData[i][j];
+		}
+	}
+}
+
+void getTestData() {
+	ifstream fin("test.csv");
+	string line;
+	int id;
+	char ch;
+	for (int i = 0; i < TEST_SIZE; i++) {
+		fin >> id;
+		for (int j = 0; j < FEATURE; j++) {
+			fin >> ch >> testData[i][j];
+		}
+	}
+}
+
+void initial() {
+	
+	for (int i = 0; i < FEATURE; i++)
+	{
+		for (int j = 0; j < HIDDEN_FEATURE; j++)
+		{
+			weight1[i][j] = random(2);
+		}
+	}
+
+	for (int i = 0; i < HIDDEN_FEATURE; i++)
+	{
+		for (int j = 0; j < OUTPUT; j++)
+		{
+			weight2[i][j] = random(2);
+		}
+		errorHidden[i] = random(2);
+	}
+	for (int i = 0; i < OUTPUT; i++)
+		errorOutput[i] = random(2);
+}
+
+void train() {
+	double inp1[FEATURE];
+	double inp2[HIDDEN_FEATURE];
+	double inp3[OUTPUT];
+	double predictValue[OUTPUT];
+	for (int isamp = 0; isamp < TRAIN_SIZE; isamp++) 
+	{
+		for (int i = 0; i < FEATURE; i++)
+		{
+			inp1[i] = trainData[isamp][i];
+		}
+		for (int i = 0; i < OUTPUT; i++)
+		{
+			predictValue[i] = value[isamp];
+		}
+
+		double active1[HIDDEN_FEATURE];
+		for (int i = 0; i < HIDDEN_FEATURE; i++)
+		{
+			active1[i] = 0.;
+			for (int j = 0; j < FEATURE; j++)
+			{
+				active1[i] += weight1[j][i]*inp1[j];
+			}
+			inp2[i] = eps(active1[i],errorHidden[i]);
+		}
+
+		double active2[OUTPUT];
+		for (int i = 0; i < OUTPUT; i++)
+		{
+			active2[i] = 0;
+			for (int j = 0; j < HIDDEN_FEATURE; j++) 
+			{
+				active2[i] += weight2[j][i]*inp2[j];
+			}
+			inp3[i] = eps(active2[i],errorOutput[i]);
+		}
+
+		double theta2[OUTPUT];
+		double theta1[HIDDEN_FEATURE];
+		 
+		for (int i = 0; i < OUTPUT; i++)
+		{
+			theta2[i] = (predictValue[i] - inp3[i])*inp3[i]*(1 - inp3[i]);
+			for (int j = 0; j < HIDDEN_FEATURE; j++)
+			{
+				weight2[j][i] += rate2*theta2[i]*hiddenValue[j];
+			}
+		}
+
+		for (int i = 0; i < HIDDEN_FEATURE; i++) 
+		{
+			for (int j = 0; j < OUTPUT; j++)
+			{
+				theta1[i] += theta1[j]*weight2[i][j];
+			}
+			theta1[i] = theta1[i]*inp2[i]*(1 - inp2[i]);
+
+			for (int j = 0; j < FEATURE; j++)
+			{
+				weight1[j][i] += rate1*theta1[i]*inp1[j];
+			}
+		}
+		double e = 0.;
+		for (int i = 0; i < OUTPUT; i++)
+		{
+			e = fabs(predictValue[i] - inp3[i])*fabs(predictValue[i] - inp3[i]);
+		}
+		error = e/2.0;
+
+		for (int i = 0; i < HIDDEN_FEATURE; i++)
+		{
+			errorHidden[i] += rate1*theta1[i];
+		}
+		for (int i = 0; i < OUTPUT; i++)
+		{
+			errorOutput[i] += rate2*theta2[i];
+		}
+	}
+}
+
+void getResult() 
+{
+	double inp1[FEATURE];
+	double inp2[HIDDEN_FEATURE];
+	for (int ite = 0; ite < TEST_SIZE; ite++)
+	{
+		for (int i = 0; i < FEATURE; i++)
+		{
+			inp1[i] = testData[ite][i]; 
+		}
+
+		double active1[HIDDEN_FEATURE];
+		for (int i = 0; i < HIDDEN_FEATURE; i++)
+		{
+			active1[i] = 0;
+			for (int j = 0; j < FEATURE; j++)
+			{
+				active1[i] += inp1[j]*weight1[j][i];
+			}
+			inp1[i] = eps(active1[i],errorHidden[i]);
+		}
+
+		double active2[OUTPUT];
+		for (int i = 0; i < OUTPUT; i++)
+		{
+			active2[i] = 0;
+			for (int j = 0; j < HIDDEN_FEATURE; j++)
+			{
+				active2[i] += inp1[j]*weight2[j][i];
+			}
+			predictValue[ite] = eps(active2[i],errorOutput[i]);
+		}
+		
+	}
+}
+
+int main() {
+	getTrainData();
+	getTestData();
+	
+
+	return 0;
+}
